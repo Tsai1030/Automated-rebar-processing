@@ -1,0 +1,77 @@
+[project]
+name = "steel-backend"
+version = "0.1.0"
+description = "Steel rebar meeting minutes auto-fill backend (FastAPI + LangGraph)"
+readme = "../README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # Web framework
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.20",
+
+    # Data / config / validation
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlmodel>=0.0.22",
+
+    # HTTP / scraping
+    "httpx>=0.27",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.3",
+    "tenacity>=9.0",
+
+    # LLM / Agent
+    "openai>=1.55",
+    "langgraph>=0.2.50",
+    "langchain>=0.3",
+    "langchain-openai>=0.2.10",
+    "langsmith>=0.1.140",
+
+    # Word output
+    "python-docx>=1.1",
+
+    # Auth
+    "python-jose[cryptography]>=3.3",
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt==4.0.1",
+
+    # Rate limit / utils
+    "slowapi>=0.1.9",
+    "python-dotenv>=1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "respx>=0.21",
+    "mypy>=1.13",
+    "ruff>=0.8",
+    "types-python-jose>=3.3.4",
+]
+
+[project.scripts]
+steel-backend = "steel_backend.main:app"
+
+[build-system]
+requires = ["uv_build>=0.11.6,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

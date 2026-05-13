@@ -1,0 +1,57 @@
+/**
+ * Single fetch wrapper for talking to the FastAPI backend.
+ *
+ * Why credentials: "include" matters:
+ *   The backend sets HttpOnly cookies for JWT. Browsers only send those
+ *   cookies cross-origin when fetch is called with credentials: "include"
+ *   AND the backend responds with Access-Control-Allow-Credentials: true.
+ *   Both halves are required — missing either silently fails.
+ */
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8001";
+
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly body: unknown,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+export async function api<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
+
+  if (!res.ok) {
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      body = await res.text();
+    }
+    if (res.status === 401 && typeof window !== "undefined") {
+      // Hard redirect — let the proxy/route guard re-evaluate auth state.
+      window.location.href = "/login";
+    }
+    throw new ApiError(res.status, body, `API ${res.status}: ${path}`);
+  }
+
+  // Some endpoints (logout) return JSON; binary downloads (Word) caller
+  // should bypass this helper and use fetch directly.
+  return res.json() as Promise<T>;
+}
+
+export const apiBase = API_BASE;
