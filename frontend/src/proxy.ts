@@ -37,6 +37,11 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except Next internals and static assets.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // Run on everything except Next internals, static assets, and the /api
+  // proxy. /api/* must skip this proxy entirely — those requests are
+  // forwarded to the FastAPI backend via next.config.ts rewrites, and the
+  // backend does its own JWT verification. If we ran this proxy on /api/*
+  // unauthenticated calls to /api/auth/login would 307→/login→405 (POST
+  // can't reach a page route).
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
