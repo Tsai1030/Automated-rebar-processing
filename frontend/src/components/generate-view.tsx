@@ -29,33 +29,41 @@ const STEP_DEFS = [
   { id: 5, label: "下載 Word", icon: Download },
 ] as const;
 
+// Durations calibrated to the real cloud workflow (~180 s end-to-end on
+// Render free + Neon). Local dev is faster (~30-60 s); the overlay
+// finishes early and closes when the polling mutation resolves, so
+// overshooting durations is fine for fast paths but undershooting (the
+// old values) leaves the bar pinned at 100% for 2 minutes — looks broken.
 const FETCH_STEPS: LoadingStep[] = [
-  { text: "連線 steelnet 鋼鐵網會員區...", durationMs: 2500 },
-  { text: "[search] 抓取本週豐興開盤新聞 (3 pages)", durationMs: 3500 },
-  { text: "[rank] 由 LLM 篩選候選文章中...", durationMs: 4000 },
-  { text: "[fetch] 下載命中文章內容", durationMs: 2500 },
-  { text: "[parse] 抽取本週牌價：SD280 / 廢鋼 / 型鋼", durationMs: 1500 },
-  { text: "[validate] 通過合理性驗證 (15,000–25,000 元/噸)", durationMs: 1500 },
-  { text: "[derive] 推算 SD280W = SD280+200, SD420 = SD280+1000", durationMs: 1500 },
-  { text: "[intl_scrap] 抽取美國貨櫃 / 日本 2H 廢鋼數字", durationMs: 1800 },
-  { text: "[history] 查詢 SQLite price_history 過去 8 週", durationMs: 1200 },
-  { text: "[csc] 讀取中鋼 八.1 / 八.2 admin 表單資料", durationMs: 1200 },
-  { text: "[LLM] OpenAI web_search 大陸西本新幹線指數...", durationMs: 6000 },
-  { text: "[LLM] OpenAI web_search LME 倫敦銅現貨...", durationMs: 6000 },
-  { text: "[LLM] 撰寫六.3 大陸西本段落 (gpt-5.4)...", durationMs: 4000 },
-  { text: "[LLM] 撰寫六.4 LME 銅價段落...", durationMs: 4000 },
-  { text: "[LLM] 撰寫九.1 國內鋼筋市場敘述...", durationMs: 4500 },
-  { text: "[LLM] 撰寫九.2 大陸鋼鐵市場敘述...", durationMs: 4500 },
-  { text: "[render] 寫入 Word 模板 (python-docx)...", durationMs: 1000 },
-  { text: "[done] 抓取完成，渲染結果頁中", durationMs: 800 },
+  { text: "連線 steelnet 鋼鐵網會員區...", durationMs: 8000 },
+  { text: "[search] 抓取本週豐興開盤新聞 (3 pages)", durationMs: 12000 },
+  { text: "[rank] 由 LLM 篩選候選文章中...", durationMs: 14000 },
+  { text: "[fetch] 下載命中文章內容", durationMs: 8000 },
+  { text: "[parse] 抽取本週牌價:SD280 / 廢鋼 / 型鋼", durationMs: 5000 },
+  { text: "[validate] 通過合理性驗證 (15,000–25,000 元/噸)", durationMs: 5000 },
+  { text: "[derive] 推算 SD280W = SD280+200, SD420 = SD280+1000", durationMs: 5000 },
+  { text: "[intl_scrap] 抽取美國貨櫃 / 日本 2H 廢鋼數字", durationMs: 6000 },
+  { text: "[history] 查詢 price_history 過去 8 週", durationMs: 4000 },
+  { text: "[csc] 讀取中鋼 八.1 / 八.2 admin 表單資料", durationMs: 4000 },
+  { text: "[LLM] OpenAI web_search 大陸西本新幹線指數...", durationMs: 21000 },
+  { text: "[LLM] OpenAI web_search LME 倫敦銅現貨...", durationMs: 21000 },
+  { text: "[LLM] 撰寫六.3 大陸西本段落 (gpt-5.4)...", durationMs: 14000 },
+  { text: "[LLM] 撰寫六.4 LME 銅價段落...", durationMs: 14000 },
+  { text: "[LLM] 撰寫九.1 國內鋼筋市場敘述...", durationMs: 15000 },
+  { text: "[LLM] 撰寫九.2 大陸鋼鐵市場敘述...", durationMs: 15000 },
+  { text: "[render] 寫入 Word 模板 (python-docx)...", durationMs: 3500 },
+  { text: "[done] 抓取完成,渲染結果頁中", durationMs: 3000 },
 ];
 
+// internal-data re-runs the whole graph too (with cached LLM web_search
+// results bypassed). Still ~60 s on cloud — stretch accordingly.
 const APPLY_STEPS: LoadingStep[] = [
-  { text: "[merge] 合併內部資料到 slot_values...", durationMs: 800 },
-  { text: "[narrate] 重新計算所有 slot 的最終值...", durationMs: 1000 },
-  { text: "[history] 重新讀取 七.1–7.5 歷史表...", durationMs: 800 },
-  { text: "[render] 寫入 Word 模板 (python-docx)...", durationMs: 1500 },
-  { text: "[done] Word 已就緒，可下載", durationMs: 600 },
+  { text: "[merge] 合併內部資料到 slot_values...", durationMs: 4000 },
+  { text: "[narrate] 重新計算所有 slot 的最終值...", durationMs: 8000 },
+  { text: "[LLM] 重新撰寫各段落敘述...", durationMs: 30000 },
+  { text: "[history] 重新讀取 七.1–7.5 歷史表...", durationMs: 4000 },
+  { text: "[render] 寫入 Word 模板 (python-docx)...", durationMs: 10000 },
+  { text: "[done] Word 已就緒,可下載", durationMs: 4000 },
 ];
 
 /**

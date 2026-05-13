@@ -164,7 +164,7 @@ function LoadingOverlayInner({ open, title, subtitle, steps }: Props) {
             className="mt-4 text-[11px] leading-relaxed text-center"
             style={{ color: "var(--text-tertiary)" }}
           >
-            視 OpenAI 回應速度約需 30–60 秒。
+            視 OpenAI 回應與雲端冷啟動約需 2–3 分鐘，請耐心等候。
           </p>
         </div>
       </div>
