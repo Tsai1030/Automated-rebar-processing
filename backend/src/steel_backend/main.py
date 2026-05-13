@@ -40,8 +40,38 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     cfg = get_settings()
     cfg.DATA_DIR.mkdir(parents=True, exist_ok=True)
     cfg.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    init_db(cfg.database_url)
+    engine = init_db(cfg.database_url)
+    _reap_stranded_runs(engine)
     yield
+
+
+def _reap_stranded_runs(engine) -> None:  # type: ignore[no-untyped-def]
+    """Mark any 'running' generation_runs as 'failed'.
+
+    On free-tier Render the service spins down after 15 min idle, killing
+    any in-flight background tasks. Their DB rows would otherwise stay at
+    'running' forever, and the frontend would poll until it gave up. Run
+    this on every startup to clear the slate. False positives (a task
+    that *just* started before a deploy) are acceptable — the user can
+    re-trigger.
+    """
+    from datetime import datetime as _dt
+    from sqlmodel import Session as _Session
+    from sqlmodel import select as _select
+
+    from .storage.models import GenerationRun
+
+    with _Session(engine) as s:
+        stranded = s.exec(
+            _select(GenerationRun).where(GenerationRun.status == "running")
+        ).all()
+        for run in stranded:
+            run.status = "failed"
+            run.finished_at = _dt.utcnow()
+            run.notes = (run.notes or "") + " [reaped on startup]"
+            s.add(run)
+        if stranded:
+            s.commit()
 
 
 def create_app() -> FastAPI:

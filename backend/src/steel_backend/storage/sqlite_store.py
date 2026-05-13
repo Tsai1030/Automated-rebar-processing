@@ -85,11 +85,18 @@ def _apply_lightweight_migrations(engine: Engine) -> None:
 
     with engine.begin() as conn:
         if dialect == "sqlite":
-            cols = {row[1] for row in conn.execute(text("PRAGMA table_info(users)"))}
-            if "is_active" not in cols:
+            user_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(users)"))}
+            if "is_active" not in user_cols:
                 conn.execute(
                     text(
                         "ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"
+                    )
+                )
+            run_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(generation_runs)"))}
+            if "result_json" not in run_cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE generation_runs ADD COLUMN result_json TEXT NOT NULL DEFAULT ''"
                     )
                 )
         elif dialect == "postgresql":
@@ -97,6 +104,12 @@ def _apply_lightweight_migrations(engine: Engine) -> None:
                 text(
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active "
                     "BOOLEAN NOT NULL DEFAULT TRUE"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE generation_runs ADD COLUMN IF NOT EXISTS "
+                    "result_json TEXT NOT NULL DEFAULT ''"
                 )
             )
         # Other dialects: SQLModel.create_all already produced the right

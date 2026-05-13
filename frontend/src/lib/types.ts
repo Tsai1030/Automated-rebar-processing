@@ -39,6 +39,7 @@ export interface GenerationStatusResponse {
   meeting_date: string; // ISO YYYY-MM-DD
   slots: SlotValueDto[];
   has_output: boolean;
+  notes?: string | null;
 }
 
 export interface GenerationStartRequest {

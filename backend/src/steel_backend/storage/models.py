@@ -75,3 +75,8 @@ class GenerationRun(SQLModel, table=True):
     # 'running' | 'success' | 'partial' | 'failed'
     output_path: str | None = None
     notes: str = ""
+    # JSON blob: slot_values + confidence + fetched_index (serialised
+    # FetchResult dicts). Populated by the background task on completion
+    # so the /status endpoint can return full results without re-running
+    # the graph. Empty string = task hasn't finished yet.
+    result_json: str = Field(default="")

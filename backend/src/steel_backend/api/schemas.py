@@ -47,6 +47,9 @@ class GenerationStatusResponse(BaseModel):
     meeting_date: date
     slots: list[SlotValueDto] = Field(default_factory=list)
     has_output: bool = False
+    # Populated when status == "failed". Frontend surfaces this as the
+    # toast message so users see the actual cause from the backend log.
+    notes: str | None = None
 
 
 class InternalDataRequest(BaseModel):

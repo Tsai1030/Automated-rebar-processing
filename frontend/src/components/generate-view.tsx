@@ -13,7 +13,7 @@ import {
   Settings2,
   Table2,
 } from "lucide-react";
-import { api, apiBase } from "@/lib/api";
+import { api, apiBase, ApiError } from "@/lib/api";
 import type {
   GenerationStartRequest,
   GenerationStatusResponse,
@@ -58,6 +58,47 @@ const APPLY_STEPS: LoadingStep[] = [
   { text: "[done] Word 已就緒，可下載", durationMs: 600 },
 ];
 
+/**
+ * Poll GET /api/generation/{run_id} every 2.5 s until status flips
+ * from "running". Render free tier cuts long HTTP requests around 100 s,
+ * so the backend runs the LangGraph workflow as a detached asyncio task
+ * and we discover its outcome by polling.
+ *
+ *   - status==="running"     → keep polling
+ *   - status==="failed"      → throw with backend's `notes` as message
+ *   - status==="success/partial" → resolve with the full response
+ *   - transient 5xx (cold start) → log + keep polling, don't bail
+ *
+ * Caps at 10 min wall clock so a wedged backend doesn't pin the UI
+ * indefinitely.
+ */
+async function pollUntilDone(
+  runId: number,
+): Promise<GenerationStatusResponse> {
+  const POLL_MS = 2500;
+  const MAX_MS = 10 * 60 * 1000;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < MAX_MS) {
+    await new Promise((r) => setTimeout(r, POLL_MS));
+    try {
+      const s = await api<GenerationStatusResponse>(
+        `/api/generation/${runId}`,
+      );
+      if (s.status === "failed") {
+        throw new Error(s.notes ?? "抓取失敗（無錯誤訊息）");
+      }
+      if (s.status !== "running") return s;
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500 && err.status < 600) {
+        // Cold-start 5xx — back off and try again.
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("等候逾時（10 分鐘）— 請查 backend log 確認 run 狀態");
+}
+
 interface InternalForm {
   meeting_time: string;
   contract_remaining_tons: string;
@@ -89,11 +130,13 @@ export function GenerateView() {
   const [result, setResult] = useState<GenerationStatusResponse | null>(null);
 
   const runMutation = useMutation({
-    mutationFn: (input: GenerationStartRequest) =>
-      api<GenerationStatusResponse>("/api/generation/run", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
+    mutationFn: async (input: GenerationStartRequest) => {
+      const initial = await api<GenerationStatusResponse>(
+        "/api/generation/run",
+        { method: "POST", body: JSON.stringify(input) },
+      );
+      return pollUntilDone(initial.run_id);
+    },
     onSuccess: (data) => {
       setResult(data);
       setStep(3);
@@ -122,10 +165,11 @@ export function GenerateView() {
           meeting_conclusion_this_week: form.meeting_conclusion_this_week,
         },
       };
-      return api<GenerationStatusResponse>(
+      await api<GenerationStatusResponse>(
         `/api/generation/${result.run_id}/internal-data`,
         { method: "POST", body: JSON.stringify(payload) },
       );
+      return pollUntilDone(result.run_id);
     },
     onSuccess: (data) => {
       setResult(data);
