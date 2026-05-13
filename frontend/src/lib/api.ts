@@ -51,7 +51,19 @@ export async function api<T>(
       // Hard redirect — let the proxy/route guard re-evaluate auth state.
       window.location.href = "/login";
     }
-    throw new ApiError(res.status, body, `API ${res.status}: ${path}`);
+    // Surface the backend's `detail` field (FastAPI's default error shape)
+    // in the message so generate-view's plain `error.message` toast is
+    // informative without each caller having to dig into `error.body`.
+    const detail =
+      body && typeof body === "object" && body !== null && "detail" in body
+        ? String((body as { detail: unknown }).detail)
+        : typeof body === "string" && body.length > 0 && body.length < 500
+          ? body
+          : null;
+    const message = detail
+      ? `API ${res.status}: ${detail}`
+      : `API ${res.status}: ${path}`;
+    throw new ApiError(res.status, body, message);
   }
 
   // Some endpoints (logout) return JSON; binary downloads (Word) caller
