@@ -1,27 +1,23 @@
 databases: []
 
 services:
-  # ── Backend: FastAPI + SQLite (on persistent disk) ──────────────────
+  # ── Backend: FastAPI on free Web Service ────────────────────────────
+  # Free plan: spins down after 15 min idle (cold start ~30-60s on wake).
+  # Persistence comes from external Postgres (Neon), not local disk.
   - type: web
     name: steel-backend
     runtime: python
     rootDir: backend
-    plan: starter   # required for persistent disk (free tier has no disk)
+    plan: free
     buildCommand: pip install uv && uv sync --frozen
     startCommand: uv run uvicorn steel_backend.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
-    disk:
-      name: data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
-      # Storage paths point at the mounted disk so DB + outputs survive deploys.
-      - key: DATA_DIR
-        value: /var/data
-      - key: DB_PATH
-        value: /var/data/app.db
-      - key: OUTPUT_DIR
-        value: /var/data/outputs
+      # Postgres connection string from Neon (free tier).
+      # Paste in Render dashboard. Format:
+      #   postgresql://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=require
+      - key: DATABASE_URL
+        sync: false
 
       # Auth / cookies: cross-site between *-frontend.onrender.com and
       # *-backend.onrender.com requires SameSite=None + Secure.
@@ -32,11 +28,11 @@ services:
       - key: COOKIE_SAMESITE
         value: "none"
 
-      # Set FRONTEND_ORIGIN to the frontend's URL after the first deploy.
+      # Set FRONTEND_ORIGIN to the frontend's URL after first deploy.
       - key: FRONTEND_ORIGIN
         sync: false
 
-      # Secrets: paste in Render dashboard (sync: false = not in git).
+      # Secrets: paste in Render dashboard.
       - key: OPENAI_API_KEY
         sync: false
       - key: STEELNET_USER
@@ -49,7 +45,7 @@ services:
     name: steel-frontend
     runtime: node
     rootDir: frontend
-    plan: starter
+    plan: free
     buildCommand: npm ci && npm run build
     startCommand: npx next start -p $PORT
     envVars:

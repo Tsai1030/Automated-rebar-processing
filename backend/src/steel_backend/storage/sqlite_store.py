@@ -1,9 +1,11 @@
-"""SQLite-backed implementations of HistoryStore + UserStore.
+"""SQLAlchemy-backed implementations of HistoryStore + UserStore.
 
-Critical: WAL mode is enabled on every connection. SQLite default is rollback
-journal, which serializes reads against writers — WAL gives us concurrent reads
-during writes, which matters when one user is generating while others browse
-history.
+Despite the module name, the engine here is *not* always SQLite — when
+`DATABASE_URL` is set (typically pointing at Neon/Postgres in production)
+we use that instead. The module name stays for git history continuity.
+
+SQLite specifics (WAL, busy_timeout PRAGMAs) only run when we're actually
+on SQLite. Postgres needs none of that.
 """
 from __future__ import annotations
 
@@ -11,7 +13,7 @@ from datetime import date as date_t
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine, select
 
@@ -31,43 +33,75 @@ def _apply_pragmas(dbapi_conn, _connection_record) -> None:  # type: ignore[no-u
     cursor.close()
 
 
-def init_db(path: Path) -> Engine:
-    """Open the SQLite db, enable WAL, create tables if missing."""
+def init_db(database_url: str) -> Engine:
+    """Open the DB, configure engine for its dialect, run table create +
+    any pending lightweight migrations.
+
+    `database_url` is a SQLAlchemy URL (already normalized in
+    Settings.database_url). For SQLite we also ensure the parent dir
+    exists so a fresh checkout doesn't fail on first run.
+    """
     global _engine
-    path.parent.mkdir(parents=True, exist_ok=True)
-    _engine = create_engine(
-        f"sqlite:///{path}",
-        connect_args={"check_same_thread": False},
-    )
-    event.listen(_engine, "connect", _apply_pragmas)
+
+    is_sqlite = database_url.startswith("sqlite:")
+
+    if is_sqlite:
+        # Extract on-disk path so we can mkdir it. URL is `sqlite:///<path>`
+        # — the three slashes mean absolute-ish; SQLAlchemy treats whatever
+        # follows the prefix as the file path.
+        on_disk = database_url[len("sqlite:///"):]
+        if on_disk:
+            Path(on_disk).parent.mkdir(parents=True, exist_ok=True)
+        _engine = create_engine(
+            database_url,
+            connect_args={"check_same_thread": False},
+        )
+        event.listen(_engine, "connect", _apply_pragmas)
+    else:
+        # Postgres (or anything else). pool_pre_ping handles Neon's idle
+        # auto-suspend: a stale connection is replaced rather than raising.
+        _engine = create_engine(database_url, pool_pre_ping=True)
+
     SQLModel.metadata.create_all(_engine)
     _apply_lightweight_migrations(_engine)
     return _engine
-
-
-def _apply_lightweight_migrations(engine: Engine) -> None:
-    """Add columns the ORM expects but legacy SQLite files lack.
-
-    Using a real migration tool (Alembic) is overkill for a solo app where
-    additive column changes are the only shape that ships. Each step is
-    idempotent — `PRAGMA table_info` first, `ALTER TABLE ADD COLUMN` only
-    when missing.
-    """
-    from sqlalchemy import text
-
-    with engine.begin() as conn:
-        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(users)"))}
-        if "is_active" not in cols:
-            # SQLite ADD COLUMN requires a constant default — `1` = True.
-            conn.execute(
-                text("ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1")
-            )
 
 
 def get_engine() -> Engine:
     if _engine is None:
         raise RuntimeError("DB not initialized — call init_db() first")
     return _engine
+
+
+def _apply_lightweight_migrations(engine: Engine) -> None:
+    """Add columns the ORM expects but legacy DBs lack.
+
+    Using a real migration tool (Alembic) is overkill for a solo app where
+    additive column changes are the only shape that ships. Each step is
+    idempotent — branched per dialect because SQLite lacks
+    `ADD COLUMN IF NOT EXISTS`.
+    """
+    dialect = engine.dialect.name
+
+    with engine.begin() as conn:
+        if dialect == "sqlite":
+            cols = {row[1] for row in conn.execute(text("PRAGMA table_info(users)"))}
+            if "is_active" not in cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"
+                    )
+                )
+        elif dialect == "postgresql":
+            conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active "
+                    "BOOLEAN NOT NULL DEFAULT TRUE"
+                )
+            )
+        # Other dialects: SQLModel.create_all already produced the right
+        # schema for greenfield DBs; if you're migrating an existing DB on
+        # an unsupported dialect, add a branch here.
 
 
 class SqliteHistoryStore(HistoryStore):

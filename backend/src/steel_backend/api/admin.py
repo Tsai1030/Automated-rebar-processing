@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlmodel import Session, select
 
 from ..auth.dependencies import CurrentUser, get_current_user, require_admin
@@ -278,10 +278,10 @@ async def usage_stats(
                 GenerationRun.started_by,
                 func.count(GenerationRun.id).label("total"),
                 func.sum(
-                    func.iif(GenerationRun.status == "success", 1, 0)
+                    case((GenerationRun.status == "success", 1), else_=0)
                 ).label("success"),
                 func.sum(
-                    func.iif(GenerationRun.status == "failed", 1, 0)
+                    case((GenerationRun.status == "failed", 1), else_=0)
                 ).label("failed"),
                 func.max(GenerationRun.started_at).label("last_run"),
             )

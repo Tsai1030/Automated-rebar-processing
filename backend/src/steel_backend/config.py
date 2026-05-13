@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     # ───────────── Storage ─────────────
     DATA_DIR: Path = _BACKEND_DIR / "data"
     DB_PATH: Path = _BACKEND_DIR / "data" / "app.db"
+    # When set (e.g. "postgresql://user:pass@host/db"), takes priority over
+    # DB_PATH. Used in production (Render → Neon Postgres). Leave empty for
+    # local dev and SQLite will be used.
+    DATABASE_URL: str | None = None
     OUTPUT_DIR: Path = _BACKEND_DIR / "data" / "outputs"
     TEMPLATE_PATH: Path = _BACKEND_DIR / "templates" / "meeting_template.docx"
 
@@ -98,6 +102,21 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [self.FRONTEND_ORIGIN, *self.EXTRA_CORS_ORIGINS]
+
+    @property
+    def database_url(self) -> str:
+        """Resolve the SQLAlchemy URL. Postgres takes priority when set;
+        otherwise fall back to SQLite at DB_PATH. The `postgresql://` prefix
+        is rewritten to `postgresql+psycopg://` so SQLAlchemy picks psycopg3
+        (the version we depend on) instead of the legacy psycopg2."""
+        url = self.DATABASE_URL
+        if not url:
+            return f"sqlite:///{self.DB_PATH}"
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url[len("postgres://"):]
+        if url.startswith("postgresql://"):
+            url = "postgresql+psycopg://" + url[len("postgresql://"):]
+        return url
 
 
 _settings: Settings | None = None

@@ -17,7 +17,7 @@ def main() -> int:
         SqliteHistoryStore, get_engine, init_db,
     )
     cfg = get_settings()
-    init_db(cfg.DB_PATH)
+    init_db(cfg.database_url)
     store = SqliteHistoryStore(get_engine())
     target = opening_monday(raw)
     sv: dict[str, str] = {}

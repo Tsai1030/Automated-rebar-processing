@@ -54,7 +54,7 @@ def main() -> int:
     from steel_backend.storage.sqlite_store import init_db
 
     cfg = get_settings()
-    engine = init_db(cfg.DB_PATH)
+    engine = init_db(cfg.database_url)
 
     for group, period, ann_date, data, products in [
         ("monthly",   "115 年 5 月份",  "2026/4/15", _MONTHLY,   MONTHLY_PRODUCTS),

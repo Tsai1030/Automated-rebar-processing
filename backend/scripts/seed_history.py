@@ -50,7 +50,7 @@ def main() -> int:
     from steel_backend.storage.sqlite_store import SqliteHistoryStore, init_db
     cfg = get_settings()
     cfg.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    engine = init_db(cfg.DB_PATH)
+    engine = init_db(cfg.database_url)
 
     if "--clear" in sys.argv:
         with Session(engine) as s:

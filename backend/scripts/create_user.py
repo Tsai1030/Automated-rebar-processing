@@ -39,7 +39,7 @@ def main() -> int:
     from steel_backend.storage.sqlite_store import SqliteUserStore, init_db
 
     cfg = get_settings()
-    engine = init_db(cfg.DB_PATH)
+    engine = init_db(cfg.database_url)
     store = SqliteUserStore(engine)
 
     existing = store.get_by_username(args.username)

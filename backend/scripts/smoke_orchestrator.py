@@ -33,7 +33,7 @@ async def main() -> int:
     cfg = get_settings()
     cfg.DATA_DIR.mkdir(parents=True, exist_ok=True)
     cfg.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    init_db(cfg.DB_PATH)
+    init_db(cfg.database_url)
 
     graph = get_graph()
     state = await graph.ainvoke({
