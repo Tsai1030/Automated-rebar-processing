@@ -73,3 +73,39 @@ export interface CscSaveRequest {
   announce_date: string;
   rows: { slot_index: number; prev_price: number; change_amount: number }[];
 }
+
+// ──────── User admin ────────
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  role: "admin" | "user";
+  is_active: boolean;
+  created_at: string;   // ISO datetime
+  last_login: string | null;
+}
+
+export interface CreateUserRequest {
+  username: string;
+  password: string;
+  role: "admin" | "user";
+}
+
+export interface UpdateUserRequest {
+  role?: "admin" | "user";
+  is_active?: boolean;
+}
+
+export interface ResetPasswordRequest {
+  password: string;
+}
+
+// ──────── Usage ────────
+
+export interface UsageRow {
+  username: string;
+  runs_total: number;
+  runs_success: number;
+  runs_failed: number;
+  last_run_at: string | null;
+}

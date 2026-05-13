@@ -17,12 +17,13 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def create_access_token(user_id: int, username: str) -> str:
+def create_access_token(user_id: int, username: str, role: str = "user") -> str:
     cfg = get_settings()
     exp = _now() + timedelta(minutes=cfg.JWT_ACCESS_TOKEN_EXPIRE_MIN)
     payload = {
         "sub": str(user_id),
         "username": username,
+        "role": role,
         "type": "access",
         "exp": exp,
         "iat": _now(),
@@ -30,12 +31,13 @@ def create_access_token(user_id: int, username: str) -> str:
     return jwt.encode(payload, cfg.JWT_SECRET_KEY, algorithm=cfg.JWT_ALGORITHM)
 
 
-def create_refresh_token(user_id: int, username: str) -> str:
+def create_refresh_token(user_id: int, username: str, role: str = "user") -> str:
     cfg = get_settings()
     exp = _now() + timedelta(days=cfg.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
     payload = {
         "sub": str(user_id),
         "username": username,
+        "role": role,
         "type": "refresh",
         "exp": exp,
         "iat": _now(),

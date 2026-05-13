@@ -1,26 +1,137 @@
 @import "tailwindcss";
 
+/* ────────────────────────────────────────────────────────────
+   macOS-inspired design tokens.
+   Reference: macOS Sequoia / Sonoma system colours, SF Pro typography.
+   ──────────────────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surface & text — light mode */
+  --surface-canvas: oklch(98% 0.005 250);          /* desktop / window bg */
+  --surface-window: oklch(99% 0.003 250);          /* main panel */
+  --surface-sidebar: oklch(96% 0.004 250 / 0.78); /* translucent sidebar */
+  --surface-titlebar: oklch(95% 0.005 250 / 0.85);
+  --surface-card: oklch(100% 0 0);
+  --surface-input: oklch(100% 0 0);
+  --surface-hover: oklch(94% 0.005 250);
+  --surface-selected: oklch(92% 0.025 256);
+
+  --text-primary: oklch(20% 0.01 250);
+  --text-secondary: oklch(45% 0.01 250);
+  --text-tertiary: oklch(60% 0.01 250);
+  --text-disabled: oklch(75% 0.01 250);
+
+  --border-subtle: oklch(90% 0.004 250);
+  --border-strong: oklch(82% 0.006 250);
+
+  /* SF system blue (oklch equivalent of #007AFF) */
+  --accent: oklch(60% 0.21 256);
+  --accent-hover: oklch(56% 0.21 256);
+  --accent-soft: oklch(94% 0.04 256);
+  --accent-text: oklch(100% 0 0);
+
+  /* Status colours (macOS HIG-aligned) */
+  --status-red: oklch(63% 0.22 27);     /* close button */
+  --status-yellow: oklch(82% 0.16 90);  /* minimize */
+  --status-green: oklch(70% 0.16 145);  /* maximize */
+  --status-success: oklch(60% 0.16 145);
+  --status-warn: oklch(70% 0.16 80);
+  --status-error: oklch(58% 0.22 27);
+
+  /* Radii */
+  --radius-window: 12px;
+  --radius-card: 10px;
+  --radius-control: 6px;
+  --radius-pill: 9999px;
+
+  /* Shadows: layered, subtle — Apple style */
+  --shadow-window:
+    0 0 0 0.5px oklch(0% 0 0 / 0.15),
+    0 12px 32px -8px oklch(0% 0 0 / 0.18),
+    0 4px 12px -4px oklch(0% 0 0 / 0.10);
+  --shadow-card:
+    0 0 0 0.5px oklch(0% 0 0 / 0.06),
+    0 1px 3px oklch(0% 0 0 / 0.05),
+    0 4px 12px -4px oklch(0% 0 0 / 0.08);
+  --shadow-popover:
+    0 0 0 0.5px oklch(0% 0 0 / 0.10),
+    0 6px 24px -6px oklch(0% 0 0 / 0.20);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* SF Pro font stack — falls back to system fonts on Windows / Linux. */
+html, body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei",
+    system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  /* Subtle macOS desktop wallpaper feel: soft directional gradient */
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, oklch(90% 0.05 256 / 0.4), transparent),
+    radial-gradient(ellipse 60% 40% at 90% 110%, oklch(92% 0.04 290 / 0.3), transparent);
+  background-attachment: fixed;
+}
+
+/* macOS-style focus ring: thin blue outline, not the chunky default */
+:where(input, textarea, select, button):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: inherit;
+}
+
+/* Scrollbars: thin, macOS-feel */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: oklch(0% 0 0 / 0.2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover { background: oklch(0% 0 0 / 0.35); }
+
+/* Cmd-K-style window animation entry */
+@keyframes window-in {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.window-in { animation: window-in 220ms cubic-bezier(0.32, 0.72, 0.0, 1.0) both; }
+
+/* Pulse for traffic-light hover detection */
+@keyframes traffic-glow {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.15); }
+}
+
+/* ─── SVG draw-by-stroke loading animation ───
+   Each path declares its own --len (path getTotalLength rounded up).
+   We animate stroke-dashoffset from --len → 0 (drawing in), hold while
+   the next paths draw, then fade out and restart together as a group. */
+
+@keyframes svg-draw-cycle {
+  0%   { stroke-dashoffset: var(--len); opacity: 0;   }
+  10%  { opacity: 1; }
+  35%  { stroke-dashoffset: 0;          opacity: 1;   }   /* fully drawn */
+  85%  { stroke-dashoffset: 0;          opacity: 0.95; }  /* hold */
+  100% { stroke-dashoffset: 0;          opacity: 0;   }   /* fade for restart */
+}
+
+/* Optional fill that swells in once the outline is complete. */
+@keyframes svg-fill-cycle {
+  0%, 35% { fill-opacity: 0; }
+  60%     { fill-opacity: 0.18; }
+  85%     { fill-opacity: 0.18; }
+  100%    { fill-opacity: 0; }
+}
+
+/* Subtle accent dot pulse — used on the brand square */
+@keyframes accent-pulse {
+  0%, 100% { transform: scale(1);    opacity: 0.85; }
+  50%      { transform: scale(1.12); opacity: 1; }
 }

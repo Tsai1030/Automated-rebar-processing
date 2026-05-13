@@ -14,6 +14,7 @@ class User(SQLModel, table=True):
     username: str = Field(index=True, unique=True, max_length=64)
     password_hash: str
     role: str = Field(default="user", max_length=16)  # 'admin' | 'user'
+    is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: datetime | None = None
 

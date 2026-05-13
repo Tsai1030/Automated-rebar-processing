@@ -1,0 +1,60 @@
+databases: []
+
+services:
+  # ── Backend: FastAPI + SQLite (on persistent disk) ──────────────────
+  - type: web
+    name: steel-backend
+    runtime: python
+    rootDir: backend
+    plan: starter   # required for persistent disk (free tier has no disk)
+    buildCommand: pip install uv && uv sync --frozen
+    startCommand: uv run uvicorn steel_backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      # Storage paths point at the mounted disk so DB + outputs survive deploys.
+      - key: DATA_DIR
+        value: /var/data
+      - key: DB_PATH
+        value: /var/data/app.db
+      - key: OUTPUT_DIR
+        value: /var/data/outputs
+
+      # Auth / cookies: cross-site between *-frontend.onrender.com and
+      # *-backend.onrender.com requires SameSite=None + Secure.
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAMESITE
+        value: "none"
+
+      # Set FRONTEND_ORIGIN to the frontend's URL after the first deploy.
+      - key: FRONTEND_ORIGIN
+        sync: false
+
+      # Secrets: paste in Render dashboard (sync: false = not in git).
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: STEELNET_USER
+        sync: false
+      - key: STEELNET_PASSWORD
+        sync: false
+
+  # ── Frontend: Next.js ───────────────────────────────────────────────
+  - type: web
+    name: steel-frontend
+    runtime: node
+    rootDir: frontend
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npx next start -p $PORT
+    envVars:
+      # NEXT_PUBLIC_* is inlined at build time — set this to the backend URL
+      # BEFORE the first frontend build, otherwise the bundle will point at
+      # localhost. After backend deploys, copy its URL here and redeploy.
+      - key: NEXT_PUBLIC_API_BASE
+        sync: false

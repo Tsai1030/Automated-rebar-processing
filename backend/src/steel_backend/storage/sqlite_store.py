@@ -41,7 +41,27 @@ def init_db(path: Path) -> Engine:
     )
     event.listen(_engine, "connect", _apply_pragmas)
     SQLModel.metadata.create_all(_engine)
+    _apply_lightweight_migrations(_engine)
     return _engine
+
+
+def _apply_lightweight_migrations(engine: Engine) -> None:
+    """Add columns the ORM expects but legacy SQLite files lack.
+
+    Using a real migration tool (Alembic) is overkill for a solo app where
+    additive column changes are the only shape that ships. Each step is
+    idempotent — `PRAGMA table_info` first, `ALTER TABLE ADD COLUMN` only
+    when missing.
+    """
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(users)"))}
+        if "is_active" not in cols:
+            # SQLite ADD COLUMN requires a constant default — `1` = True.
+            conn.execute(
+                text("ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1")
+            )
 
 
 def get_engine() -> Engine:

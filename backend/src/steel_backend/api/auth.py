@@ -42,11 +42,14 @@ async def login(
     user = store.get_by_username(body.username)
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+    if not user.is_active:
+        # Same generic message — don't leak that the username exists.
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     assert user.id is not None
     store.touch_last_login(user.id)
 
-    access = create_access_token(user.id, user.username)
-    refresh = create_refresh_token(user.id, user.username)
+    access = create_access_token(user.id, user.username, user.role)
+    refresh = create_refresh_token(user.id, user.username, user.role)
     set_auth_cookies(response, access, refresh)
     return LoginResponse(
         user=UserResponse(id=user.id, username=user.username, role=user.role)
@@ -85,14 +88,16 @@ async def refresh(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(e)) from e
     user_id = int(payload["sub"])
     username = payload["username"]
-    new_access = create_access_token(user_id, username)
+    role = payload.get("role", "user")
+    new_access = create_access_token(user_id, username, role)
+    cfg = get_settings()
     response.set_cookie(
         key=ACCESS_COOKIE,
         value=new_access,
         httponly=True,
-        secure=get_settings().COOKIE_SECURE,
-        samesite="lax",
-        max_age=get_settings().JWT_ACCESS_TOKEN_EXPIRE_MIN * 60,
+        secure=cfg.COOKIE_SECURE,
+        samesite=cfg.COOKIE_SAMESITE,
+        max_age=cfg.JWT_ACCESS_TOKEN_EXPIRE_MIN * 60,
         path="/",
     )
     return {"ok": True}

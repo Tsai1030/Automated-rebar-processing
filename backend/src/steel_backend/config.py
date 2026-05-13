@@ -5,8 +5,9 @@ All tunable values live here — never hardcode URLs / thresholds elsewhere.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Project root = parent of backend/
@@ -43,6 +44,10 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MIN: int = 30
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     COOKIE_SECURE: bool = False  # True in production with HTTPS
+    # "lax" works when frontend + backend share a site. Cross-site (e.g.
+    # frontend on *-frontend.onrender.com calling *-backend.onrender.com,
+    # which the PSL treats as cross-site) requires "none" + Secure.
+    COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
 
     # ───────────── Server / CORS ─────────────
     BACKEND_HOST: str = "0.0.0.0"
@@ -80,6 +85,15 @@ class Settings(BaseSettings):
         if len(v) < 32:
             raise ValueError("JWT_SECRET_KEY must be at least 32 characters")
         return v
+
+    @model_validator(mode="after")
+    def _check_samesite_secure(self) -> Settings:
+        if self.COOKIE_SAMESITE == "none" and not self.COOKIE_SECURE:
+            raise ValueError(
+                "COOKIE_SECURE must be True when COOKIE_SAMESITE='none' "
+                "(browsers reject SameSite=None without Secure)."
+            )
+        return self
 
     @property
     def cors_origins(self) -> list[str]:

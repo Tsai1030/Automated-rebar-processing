@@ -258,10 +258,19 @@ def _node_validate(state: FengxingFinderState) -> dict:
 
 def _node_expand_window(state: FengxingFinderState) -> dict:
     """Move search window one month earlier (covers "first week of month" case
-    where the relevant article was published in prior month)."""
+    where the relevant article was published in prior month).
+
+    Always increments `search_attempts` so the route function below can detect
+    "we've given up" by the counter alone — keeping route logic simple and
+    avoiding the off-by-one infinite loop we had before.
+    """
     attempts = state.get("search_attempts", 0)
     if attempts >= 2:
-        return {"log": [f"[expand] giving up after {attempts} window expansions"]}
+        # Sentinel: bumping past 2 lets _route_after_expand return END.
+        return {
+            "search_attempts": attempts + 1,
+            "log": [f"[expand] giving up after {attempts} window expansions"],
+        }
     cur_y = state.get("search_year") or state["target_monday"].year
     cur_m = state.get("search_month") or state["target_monday"].month
     new_m = cur_m - 1 if cur_m > 1 else 12
@@ -283,13 +292,21 @@ def _route_after_rank(state: FengxingFinderState) -> str:
     return "fetch_extract" if state.get("picked_url") else "expand_window"
 
 
+# If a month yields more than this many failed attempts, we assume we're
+# in the wrong month (e.g. the right article got pushed to prior month).
+# Avoids burning 20 fetches on a wrong-month listing.
+_MAX_TRIES_PER_MONTH = 8
+
+
 def _route_after_validate(state: FengxingFinderState) -> str:
     if state.get("final") is not None:
         return END
-    # No SD280 → try next candidate; if none left, expand window
     candidates = state.get("candidates", [])
     tried = set(state.get("tried_urls", []))
-    if any(c["url"] not in tried for c in candidates):
+    untried = [c for c in candidates if c["url"] not in tried]
+    # Cap: stop trying this month after _MAX_TRIES_PER_MONTH failed candidates
+    tried_in_this_month = sum(1 for c in candidates if c["url"] in tried)
+    if untried and tried_in_this_month < _MAX_TRIES_PER_MONTH:
         return "rank_pick"
     return "expand_window"
 

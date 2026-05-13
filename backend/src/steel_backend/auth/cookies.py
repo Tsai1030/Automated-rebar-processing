@@ -16,7 +16,7 @@ def set_auth_cookies(response: Response, access: str, refresh: str) -> None:
         value=access,
         httponly=True,
         secure=cfg.COOKIE_SECURE,
-        samesite="lax",
+        samesite=cfg.COOKIE_SAMESITE,
         max_age=cfg.JWT_ACCESS_TOKEN_EXPIRE_MIN * 60,
         path="/",
     )
@@ -25,7 +25,7 @@ def set_auth_cookies(response: Response, access: str, refresh: str) -> None:
         value=refresh,
         httponly=True,
         secure=cfg.COOKIE_SECURE,
-        samesite="lax",
+        samesite=cfg.COOKIE_SAMESITE,
         max_age=cfg.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/api/auth",  # only sent to refresh endpoint
     )
