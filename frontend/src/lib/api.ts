@@ -36,11 +36,16 @@ export async function api<T>(
   });
 
   if (!res.ok) {
-    let body: unknown;
+    // Read the body exactly once — Response.body is a one-shot stream, so
+    // calling .json() and then falling back to .text() on the same Response
+    // throws "body stream already read". Take the raw text first, then
+    // attempt to parse it as JSON.
+    const raw = await res.text();
+    let body: unknown = raw;
     try {
-      body = await res.json();
+      body = JSON.parse(raw);
     } catch {
-      body = await res.text();
+      /* leave as raw text */
     }
     if (res.status === 401 && typeof window !== "undefined") {
       // Hard redirect — let the proxy/route guard re-evaluate auth state.

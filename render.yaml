@@ -43,6 +43,19 @@ services:
       - key: STEELNET_PASSWORD
         sync: false
 
+      # LangSmith tracing — same keys langchain reads from os.environ.
+      # Without these the LangGraph runs won't show up in the LangSmith UI.
+      - key: LANGCHAIN_TRACING_V2
+        value: "true"
+      - key: LANGCHAIN_API_KEY
+        sync: false
+      - key: LANGCHAIN_PROJECT
+        value: "LangGraph-web"
+
+      # Match the model id used in local .env
+      - key: OPENAI_MODEL
+        value: "gpt-5.4-mini"
+
   # ── Frontend: Next.js ───────────────────────────────────────────────
   - type: web
     name: steel-frontend
