@@ -19,14 +19,17 @@ services:
       - key: DATABASE_URL
         sync: false
 
-      # Auth / cookies: cross-site between *-frontend.onrender.com and
-      # *-backend.onrender.com requires SameSite=None + Secure.
+      # Auth / cookies: the frontend proxies /api/* via Next.js rewrites
+      # (see frontend/next.config.ts → API_PROXY_TARGET), so the browser
+      # sees every request as same-origin. SameSite=lax is enough; SameSite=
+      # none would force third-party-cookie semantics which Chrome blocks
+      # on free *.onrender.com subdomains.
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: COOKIE_SECURE
         value: "true"
       - key: COOKIE_SAMESITE
-        value: "none"
+        value: "lax"
 
       # Set FRONTEND_ORIGIN to the frontend's URL after first deploy.
       - key: FRONTEND_ORIGIN
@@ -49,8 +52,12 @@ services:
     buildCommand: npm ci && npm run build
     startCommand: npx next start -p $PORT
     envVars:
-      # NEXT_PUBLIC_* is inlined at build time — set this to the backend URL
-      # BEFORE the first frontend build, otherwise the bundle will point at
-      # localhost. After backend deploys, copy its URL here and redeploy.
+      # Empty so api.ts uses relative URLs (/api/...) — same-origin from
+      # the browser. Must be set explicitly to "" rather than unset, since
+      # api.ts falls back to http://localhost:8001 when the var is missing.
       - key: NEXT_PUBLIC_API_BASE
+        value: ""
+      # Server-side only: Next.js rewrites /api/* → this URL inside the
+      # frontend's Node process. Set this to the backend's onrender.com URL.
+      - key: API_PROXY_TARGET
         sync: false

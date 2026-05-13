@@ -12,6 +12,22 @@ const nextConfig: NextConfig = {
     "172.16.*",           // Docker default
     "*.ts.net",           // Tailscale magicdns
   ],
+
+  // When API_PROXY_TARGET is set (production deploy), the frontend's Node
+  // server proxies /api/* to the FastAPI backend. This keeps every request
+  // same-origin from the browser's perspective — no CORS, no cross-site
+  // cookies, no SameSite=None third-party blocking. Browsers store the
+  // backend's Set-Cookie under the frontend domain and re-send it on every
+  // subsequent /api/* call. Local dev leaves API_PROXY_TARGET unset and the
+  // existing NEXT_PUBLIC_API_BASE fallback in lib/api.ts handles direct
+  // calls to http://localhost:8001.
+  async rewrites() {
+    const target = process.env.API_PROXY_TARGET;
+    if (!target) return [];
+    return [
+      { source: "/api/:path*", destination: `${target}/api/:path*` },
+    ];
+  },
 };
 
 export default nextConfig;
