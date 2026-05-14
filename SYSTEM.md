@@ -508,6 +508,23 @@ erDiagram
 
 只支援 additive 變更；要 drop/rename 才需要上 Alembic，目前用不到。
 
+### Schema 改動 SOP
+
+| 改動類型 | 步驟 |
+|---|---|
+| 加新 table | 在 `storage/models.py` 寫 SQLModel class，啟動時 `create_all` 自動建 |
+| 加 nullable column | model 加 `Optional[X] = None` 欄位即可；既有 DB 啟動會看不到差，但 query 也不會炸（SQLite 容忍多餘 model 欄位）|
+| 加 NOT NULL column | 1) model 加欄位含 default 2) **同時** 在 `_apply_lightweight_migrations` 加 SQLite + Postgres 兩段 ALTER |
+| drop / rename / 改型別 / 加 constraint | 不要硬幹。先評估「值不值得上 Alembic」（見下） |
+
+### 什麼時候升級到 Alembic
+
+任一條成立就值得花 1-2 小時導入：
+- 第一次要 rename / drop / change-type 既有欄位
+- 要做資料遷移（拆欄位、合表、回填）
+- 多人協作開始改 model，PR diff 要看到 schema 變化
+- 部署環境拆成 staging + prod，需要 forward / rollback 步驟
+
 ---
 
 ## 10. Slot schema 設計細節
