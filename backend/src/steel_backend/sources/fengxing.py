@@ -37,16 +37,6 @@ def _slot_map() -> list[tuple[str, str]]:
     ]
 
 
-_FALLBACK_2026_05_04: dict[str, float] = {
-    "fx_sd280_price": 18_900.0,
-    "fx_sd280w_price": 19_100.0,
-    "fx_sd420_price": 19_900.0,
-    "fx_sd420w_price": 19_900.0,
-    "fx_scrap_base_price": 9_900.0,
-    "fx_section_steel_price": 24_500.0,
-}
-
-
 def _derive_grades(sd280: int) -> dict[str, int]:
     sd420 = sd280 + 1000
     return {
@@ -111,15 +101,22 @@ class FengxingAdapter(SourceAdapter):
         ]
 
     def _fallback(self, target_date: date, *, reason: str) -> list[FetchResult]:
-        is_known = target_date.isoformat() == "2026-05-04"
+        """Return placeholder rows so downstream nodes don't crash.
+
+        All values None + confidence='low' → the renderer surfaces them
+        as red "—" cells, making it obvious the agent didn't find data.
+        We deliberately don't return any hardcoded numbers here; silent
+        defaults would slip into a Word doc that looks complete.
+        """
+        _ = target_date
         return [
             FetchResult(
                 slot_key=key,
-                value=_FALLBACK_2026_05_04[key] if is_known else None,
+                value=None,
                 unit="元/噸",
                 raw_text=f"[fallback: {reason}]",
                 source_url="",
-                confidence="high" if is_known else "low",
+                confidence="low",
             )
             for key, _ in _slot_map()
         ]
