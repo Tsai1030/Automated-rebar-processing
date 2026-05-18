@@ -143,7 +143,7 @@ function LoginForm() {
         <div className="px-8 pt-8 pb-7 flex flex-col items-center">
           {/* Logo */}
           <Image
-            src="/logo.png"
+            src="/logo1.png"
             alt="BES logo"
             width={84}
             height={84}

@@ -139,7 +139,7 @@ export function MacShell({
             <div className="px-4 pt-5 pb-3">
               <div className="flex items-center gap-2.5">
                 <Image
-                  src="/logo.png"
+                  src="/logo1.png"
                   alt="BES logo"
                   width={36}
                   height={36}
